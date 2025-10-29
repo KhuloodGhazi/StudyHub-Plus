@@ -1,3 +1,5 @@
+// StudyHup/components/challengeModal.tsx
+
 import React, { useEffect, useState } from "react";
 import Modal from "react-modal";
 import DatePicker from "react-datepicker";
@@ -30,7 +32,8 @@ export default function ChallengeModal({
     if (initialData) {
       setTitle(initialData.title || "");
       setDescription(initialData.description || "");
-      setRequirements(initialData.requirements || []);
+      // ✅ الضرورة الوحيدة: نقرأ من tasks لو موجودة وإلا من requirements
+      setRequirements(initialData.tasks || initialData.requirements || []);
       setLevel(initialData.level || "Easy");
       setStartDate(
         initialData.start_date ? new Date(initialData.start_date) : new Date()
@@ -63,10 +66,17 @@ export default function ChallengeModal({
     const err = validate();
     if (err) return setErrors(err);
 
+    // ✅ الضرورة الثانية: نرسل tasks للخادم (ونخلّي المتطلبات نظيفة)
+    const cleanTasks = requirements
+      .map((r) => r.trim())
+      .filter((r) => r.length > 0);
+
     const data = {
       title,
       description,
-      requirements,
+      // نرسل الحقلين لضمان التوافق، لكن الخادم والصفحة الثانية يعتمدون tasks
+      tasks: cleanTasks,
+      requirements: cleanTasks,
       level,
       start_date: startDate ? startDate.toISOString().split("T")[0] : null,
       end_date: endDate ? endDate.toISOString().split("T")[0] : null,

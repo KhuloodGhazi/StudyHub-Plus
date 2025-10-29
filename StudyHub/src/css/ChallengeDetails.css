@@ -20,9 +20,7 @@
   transition: 0.3s;
   margin-bottom: 20px;
 }
-.back-btn:hover {
-  background-color: #7b6bd9;
-}
+.back-btn:hover { background-color: #7b6bd9; }
 
 /* العنوان في المنتصف */
 .challenge-title {
@@ -41,28 +39,10 @@
   flex-wrap: wrap;
   gap: 12px;
 }
-
-.creator {
-  color: #b0b0b0;
-  font-weight: 500;
-}
-
-.level {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-weight: 600;
-  color: #001b44;
-}
-
-.level .material-icons {
-  font-size: 18px;
-}
-
-.dates {
-  color: #444;
-  font-size: 14px;
-}
+.creator { color: #b0b0b0; font-weight: 500; }
+.level { display: flex; align-items: center; gap: 6px; font-weight: 600; color: #001b44; }
+.level .material-icons { font-size: 18px; }
+.dates { color: #444; font-size: 14px; }
 
 /* الوصف */
 .challenge-description {
@@ -73,83 +53,155 @@
 }
 
 /* شريط التقدّم */
-.progress-section {
-  margin-bottom: 30px;
-}
-
+.progress-section { margin-bottom: 30px; }
 .progress-labels {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-weight: 700;
-  font-size: 14px;
-  margin-bottom: 5px;
+  display: flex; justify-content: space-between; align-items: center;
+  font-weight: 700; font-size: 14px; margin-bottom: 5px;
 }
-
 .progress-bar {
-  width: 100%;
-  height: 10px;
-  background: #e0e0e0;
-  border-radius: 50px;
-  margin-bottom: 15px;
-  overflow: hidden;
+  width: 100%; height: 10px; background: #e0e0e0;
+  border-radius: 50px; margin-bottom: 15px; overflow: hidden;
 }
-
-.progress-fill {
-  height: 100%;
-  border-radius: 50px;
-  transition: width 0.4s ease;
-}
+.progress-fill { height: 100%; border-radius: 50px; transition: width 0.4s ease; }
 
 /* ألوان الصعوبة */
-.easy .progress-fill {
-  background-color: #3140c4;
-}
-.medium .progress-fill {
-  background-color: #f6a623;
-}
-.hard .progress-fill {
-  background-color: #e74c3c;
-}
+.easy .progress-fill   { background-color: #3140c4; }
+.medium .progress-fill { background-color: #f6a623; }
+.hard .progress-fill   { background-color: #e74c3c; }
 
 /* النسبة بنفس لون المستوى */
-.easy .progress-percent {
-  color: #3140c4;
+.easy .progress-percent   { color: #3140c4; }
+.medium .progress-percent { color: #f6a623; }
+.hard .progress-percent   { color: #e74c3c; }
+
+/* المتطلبات */
+.requirements h3 { font-size: 18px; font-weight: 700; margin-bottom: 15px; }
+.requirements ul { list-style: none; padding: 0; }
+.requirements li {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 15px; color: #000; margin-bottom: 10px;
 }
-.medium .progress-percent {
-  color: #f6a623;
+.requirements li .material-icons { font-size: 20px; }
+
+/* تحسين التفاعل */
+.challenge-details-page:hover { transform: translateY(-1px); transition: transform 0.2s ease; }
+
+/* =========================
+   Alias لنسخة التفاصيل المستخدمة في الكود (.challenge-details)
+   — بدون ما نلمس شغل البنات
+   ========================= */
+
+/* الحاوية */
+.challenge-details {
+  max-width: 980px;
+  margin: 24px auto 60px;
+  padding: 20px 24px 32px;
+  background: #f6f4ef;
+  border-radius: 18px;
+  font-family: "DM Sans", sans-serif;
+  color: #001b44;
 }
-.hard .progress-percent {
-  color: #e74c3c;
+
+/* زر الرجوع داخل التفاصيل */
+.challenge-details .back-btn {
+  background: #8a80c9;
+  color: #fff;
+  border: 0;
+  padding: 8px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 600;
+  margin-bottom: 14px;
+}
+.challenge-details .back-btn:hover { opacity: .92; }
+
+/* العنوان */
+.challenge-details h1 {
+  text-align: center;
+  font-size: 32px;
+  line-height: 1.2;
+  margin: 6px 0 16px;
+  color: #0a2342;
+  font-weight: 800;
+}
+
+/* صف المعلومات */
+.challenge-details .details-info {
+  display: flex; gap: 18px; flex-wrap: wrap;
+  align-items: center; justify-content: center;
+  margin-bottom: 10px;
+}
+.challenge-details .creator { color: #667085; font-weight: 600; }
+.challenge-details .level { display: inline-flex; align-items: center; gap: 6px; color: #0a2342; font-weight: 700; }
+.challenge-details .level .material-icons { font-size: 18px; }
+.challenge-details .dates { color: #475467; font-weight: 600; }
+
+/* الوصف */
+.challenge-details .challenge-description {
+  max-width: 860px;
+  margin: 6px auto 18px;
+  color: #344054;
+  line-height: 1.6;
+  text-align: center;
+}
+
+/* التقدّم */
+.challenge-details .progress-section { max-width: 860px; margin: 12px auto 16px; }
+.challenge-details .progress-label {
+  display: flex; justify-content: space-between; align-items: center;
+  color: #0a2342; font-weight: 700; margin: 10px 0 6px;
+}
+.challenge-details .progress-bar {
+  width: 100%; height: 10px; background: #e6e7eb;
+  border-radius: 999px; overflow: hidden;
+}
+.challenge-details .progress-fill {
+  height: 100%; width: 0%; border-radius: 999px;
+  transition: width .35s ease; background: #6e63cf; /* default */
+}
+
+/* تلوين حسب المستوى */
+.challenge-details.easy  .progress-fill,
+.challenge-details.easy  .save-btn { background: #3140c4; }
+.challenge-details.medium .progress-fill,
+.challenge-details.medium .save-btn { background: #f6a623; }
+.challenge-details.hard  .progress-fill,
+.challenge-details.hard  .save-btn { background: #e74c3c; }
+
+/* عدّاد المشاركين */
+.challenge-details .meta-counters { display: flex; justify-content: center; gap: 16px; color: #0a2342; }
+.challenge-details .participants-row {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: #fff; padding: 8px 12px; border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, .06);
 }
 
 /* المتطلبات */
-.requirements h3 {
-  font-size: 18px;
-  font-weight: 700;
-  margin-bottom: 15px;
+.challenge-details .requirements { max-width: 860px; margin: 18px auto 0; }
+.challenge-details .requirements h3 { color: #0a2342; margin-bottom: 10px; }
+.challenge-details .requirements ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.challenge-details .requirements li {
+  display: flex; align-items: center; gap: 10px;
+  background: #ffffff; padding: 10px 12px; border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, .06);
+  color: #344054; font-weight: 600;
 }
+.challenge-details .requirements .material-icons { font-size: 18px; color: #22c55e; }
 
-.requirements ul {
-  list-style: none;
-  padding: 0;
+/* أزرار الانضمام/المغادرة */
+.challenge-details .save-btn,
+.challenge-details .cancel-btn {
+  display: inline-block; border: 0; border-radius: 12px;
+  padding: 12px 16px; font-weight: 700; cursor: pointer;
 }
+.challenge-details .save-btn { color: #fff; }
+.challenge-details .save-btn:disabled { opacity: .6; cursor: not-allowed; }
+.challenge-details .cancel-btn { background: #e9ecf2; color: #0a2342; }
+.challenge-details .cancel-btn:hover { filter: brightness(.98); }
 
-.requirements li {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 15px;
-  color: #000;
-  margin-bottom: 10px;
-}
-
-.requirements li .material-icons {
-  font-size: 20px;
-}
-
-/* تحسين التفاعل */
-.challenge-details-page:hover {
-  transform: translateY(-1px);
-  transition: transform 0.2s ease;
+/* Responsive */
+@media (max-width: 640px) {
+  .challenge-details { margin: 12px 8px 40px; padding: 16px; }
+  .challenge-details h1 { font-size: 26px; }
+  .challenge-details .details-info { gap: 10px; }
 }

@@ -1,10 +1,11 @@
 from pydantic import BaseModel
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Union
 
 class UserCreate(BaseModel):
     name: str
     email: str
     password: str
+
 
 class UserResponse(BaseModel):
     id: int
@@ -13,6 +14,7 @@ class UserResponse(BaseModel):
 
     class Config:
         orm_mode = True
+
 
 # (Request Body)
 class ChallengeCreate(BaseModel):
@@ -23,10 +25,13 @@ class ChallengeCreate(BaseModel):
     start_date: Optional[str] = None
     end_date: Optional[str] = None
     max_participants: int = 1
+
+    # ✅ تعديل: استخدم default_factory بدل [] لتفادي mutable default
     tasks: Optional[List[str]] = []
-    participants: Optional[List[int]] = []
+    participants: Optional[List[Union[int, str]]] = []
     progress: Optional[Dict[str, float]] = {}
     group_progress: Optional[float] = 0.0
+
 
 # (Response Body)
 class ChallengeResponse(BaseModel):
@@ -37,15 +42,17 @@ class ChallengeResponse(BaseModel):
     creator_name: str
     start_date: Optional[str]
     end_date: Optional[str]
-    participants: int
+
+    # ✅ تعديل: السماح بقائمة IDs أو أسماء
+    participants: Optional[List[Union[int, str]]]
     max_participants: int
     tasks: Optional[List[str]]
-    participants: Optional[List[int]]
     progress: Optional[Dict[str, float]]
     group_progress: Optional[float]
 
     class Config:
         orm_mode = True
+
 
 # (JOIN)
 class ChallengeJoin(BaseModel):

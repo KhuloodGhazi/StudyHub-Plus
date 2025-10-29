@@ -1,6 +1,7 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Body
 from passlib.context import CryptContext
 from fastapi.middleware.cors import CORSMiddleware
+from typing import Optional
 import json
 from pathlib import Path
 
@@ -127,54 +128,138 @@ def get_challenge(challenge_id: int, db: SessionLocal = Depends(get_db)):
 # 🤝 Join Challenge
 # ============================================================
 @app.post("/api/challenges/{challenge_id}/join")
-def join_challenge(challenge_id: int, user_id: int, db: SessionLocal = Depends(get_db)):
+def join_challenge(
+    challenge_id: int,
+    user_id: Optional[int] = None,                  # Query: ?user_id=123
+    payload: Optional[dict] = Body(None),           # Body: {"user_name": "..."} أو {"username": "..."}
+    db: SessionLocal = Depends(get_db),
+):
     challenge = db.query(models.Challenge).filter(models.Challenge.id == challenge_id).first()
     if not challenge:
         raise HTTPException(status_code=404, detail="Challenge not found")
 
+    # حاول استنباط الاسم من الـ Body إن وجد
+    user_name = None
+    if isinstance(payload, dict):
+        user_name = payload.get("user_name") or payload.get("username")
+
+    # إن ما توفر id وحصلنا اسم؛ جرّب نجيبه من جدول المستخدمين
+    if user_id is None and user_name:
+        row = db.query(models.User).filter(models.User.name == user_name).first()
+        if row:
+            user_id = row.id
+
+    # حدّد طريقة التعريف
+    ident_mode, ident = None, None
+    if user_id is not None:
+        ident_mode, ident = "id", int(user_id)
+    elif user_name:
+        ident_mode, ident = "name", user_name.strip()
+    else:
+        raise HTTPException(status_code=400, detail="user_id or user_name is required")
+
     participants = challenge.participants or []
 
-    if user_id in participants:
+    # طَبِّع نوع العناصر حسب الوضع
+    if ident_mode == "id":
+        normalized = []
+        for p in participants:
+            if isinstance(p, int):
+                normalized.append(p)
+            elif isinstance(p, str) and p.isdigit():
+                normalized.append(int(p))
+        participants = normalized
+    else:
+        participants = [str(p) for p in participants]
+
+    if ident in participants:
         raise HTTPException(status_code=400, detail="User already joined this challenge")
 
-    if len(participants) >= challenge.max_participants:
+    if challenge.max_participants and len(participants) >= challenge.max_participants:
         raise HTTPException(status_code=400, detail="This challenge is already full")
 
-    participants.append(user_id)
+    participants.append(ident)
     challenge.participants = participants
-    challenge.progress[str(user_id)] = 0  # يبدأ التقدم من 0%
+
+    # progress dict
+    if not isinstance(challenge.progress, dict):
+        challenge.progress = {}
+    challenge.progress[str(ident)] = challenge.progress.get(str(ident), 0)
+
     db.commit()
     db.refresh(challenge)
-
     return {"message": "Joined successfully", "participants": len(participants)}
 
 
 # ============================================================
-# 🚪 Leave Challenge
+# 🚪 Leave Challenge  (يدعم الإزالة بالاسم أو بالـID أو رقم كنص)
 # ============================================================
 @app.delete("/api/challenges/{challenge_id}/leave")
-def leave_challenge(challenge_id: int, user_id: int, db: SessionLocal = Depends(get_db)):
+def leave_challenge(
+    challenge_id: int,
+    user_id: Optional[int] = None,                # Query: ?user_id=123
+    payload: Optional[dict] = Body(None),         # Body: {"user_name": "..."} أو {"username": "..."}
+    db: SessionLocal = Depends(get_db),
+):
     challenge = db.query(models.Challenge).filter(models.Challenge.id == challenge_id).first()
     if not challenge:
         raise HTTPException(status_code=404, detail="Challenge not found")
 
-    participants = challenge.participants or []
+    user_name = None
+    if isinstance(payload, dict):
+        user_name = payload.get("user_name") or payload.get("username")
 
-    if user_id not in participants:
+    participants_raw = challenge.participants or []
+
+    # جرّب إزالة المستخدم سواء كان محفوظ كـ id أو name (أو رقم كنص)
+    new_participants = []
+    removed = False
+
+    for p in participants_raw:
+        # رقم حقيقي
+        if isinstance(p, int):
+            if user_id is not None and p == int(user_id):
+                removed = True
+                continue
+            new_participants.append(p)
+            continue
+
+        # نص
+        if isinstance(p, str):
+            # رقم كنص
+            if p.isdigit():
+                if user_id is not None and int(p) == int(user_id):
+                    removed = True
+                    continue
+            # اسم
+            if user_name and p == user_name.strip():
+                removed = True
+                continue
+            new_participants.append(p)
+            continue
+
+        # أي نوع غير متوقع نُبقيه
+        new_participants.append(p)
+
+    if not removed:
         raise HTTPException(status_code=400, detail="User not in this challenge")
 
-    participants.remove(user_id)
-    challenge.participants = participants
-    challenge.progress.pop(str(user_id), None)
+    challenge.participants = new_participants
 
-    # تحديث التقدم الجماعي
-    progresses = list(challenge.progress.values())
+    # نظّف سجل التقدّم لكلا المعرّفين (لو وُجدوا)
+    if isinstance(challenge.progress, dict):
+        if user_id is not None:
+            challenge.progress.pop(str(user_id), None)
+        if user_name:
+            challenge.progress.pop(user_name.strip(), None)
+
+    # تحديث متوسط تقدّم المجموعة
+    progresses = list(challenge.progress.values()) if isinstance(challenge.progress, dict) else []
     challenge.group_progress = round(sum(progresses) / len(progresses), 2) if progresses else 0
 
     db.commit()
     db.refresh(challenge)
-
-    return {"message": "Left challenge successfully", "participants": len(participants)}
+    return {"message": "Left challenge successfully", "participants": len(new_participants)}
 
 
 # ============================================================
