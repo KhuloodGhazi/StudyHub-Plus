@@ -26,19 +26,19 @@ class Challenge(Base):
     start_date = Column(String, nullable=True)
     end_date = Column(String, nullable=True)
 
-    # ✅ JSON + default=list عشان ما نستخدم [] المشتركة بين كل الصفوف
+    #  JSON + default=list عشان ما نستخدم [] المشتركة بين كل الصفوف
     participants = Column(JSON, default=list)
     # participants = Column(Integer, default=0)
 
     max_participants = Column(Integer, nullable=False, default=10)
 
-    # ✅ نفس الفكرة للمهام
+    #  نفس الفكرة للمهام
     tasks = Column(JSON, default=list)
 
-    # ✅ default=dict بدل {} لتفادي mutable default
+    #  default=dict بدل {} لتفادي mutable default
     progress = Column(JSON, default=dict)
 
-    # ✅ نخزن كنسبة float (الكود يحسب round(..., 2))
+    #  نخزن كنسبة float (الكود يحسب round(..., 2))
     group_progress = Column(Float, default=0.0)
 
     creator_id = Column(Integer, ForeignKey("users.id"))
