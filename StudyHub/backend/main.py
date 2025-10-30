@@ -52,9 +52,7 @@ def root():
     return {"message": "FastAPI backend is working!"}
 
 
-# ============================================================
-# 👤 Register endpoint
-# ============================================================
+#  Register endpoint
 @app.post("/api/register")
 def register(user: schemas.UserCreate, db: SessionLocal = Depends(get_db)):
     existing_user = db.query(models.User).filter(models.User.email == user.email).first()
@@ -71,9 +69,7 @@ def register(user: schemas.UserCreate, db: SessionLocal = Depends(get_db)):
     return {"message": "User registered successfully", "name": user.name}
 
 
-# ============================================================
-# 🔐 Login endpoint
-# ============================================================
+# Login endpoint
 @app.post("/api/login")
 def login(data: dict, db: SessionLocal = Depends(get_db)):
     user = db.query(models.User).filter(models.User.email == data.get("email")).first()
@@ -83,9 +79,7 @@ def login(data: dict, db: SessionLocal = Depends(get_db)):
     return {"message": "Login successful", "user": user.name}
 
 
-# ============================================================
-# 🏁 Challenges Endpoints
-# ============================================================
+# Challenges Endpoints
 
 # Create a new Challenge (POST)
 @app.post("/api/challenges", response_model=schemas.ChallengeResponse)
@@ -124,9 +118,7 @@ def get_challenge(challenge_id: int, db: SessionLocal = Depends(get_db)):
     return challenge
 
 
-# ============================================================
-# 🤝 Join Challenge
-# ============================================================
+# Join Challenge
 @app.post("/api/challenges/{challenge_id}/join")
 def join_challenge(
     challenge_id: int,
@@ -191,9 +183,8 @@ def join_challenge(
     return {"message": "Joined successfully", "participants": len(participants)}
 
 
-# ============================================================
-# 🚪 Leave Challenge  (يدعم الإزالة بالاسم أو بالـID أو رقم كنص)
-# ============================================================
+# Leave Challenge  (يدعم الإزالة بالاسم أو بالـID أو رقم كنص)
+
 @app.delete("/api/challenges/{challenge_id}/leave")
 def leave_challenge(
     challenge_id: int,
@@ -262,9 +253,7 @@ def leave_challenge(
     return {"message": "Left challenge successfully", "participants": len(new_participants)}
 
 
-# ============================================================
-# 📈 Update Progress
-# ============================================================
+# Update Progress
 @app.patch("/api/challenges/{challenge_id}/progress")
 def update_progress(challenge_id: int, user_id: int, progress: float, db: SessionLocal = Depends(get_db)):
     challenge = db.query(models.Challenge).filter(models.Challenge.id == challenge_id).first()
@@ -288,9 +277,8 @@ def update_progress(challenge_id: int, user_id: int, progress: float, db: Sessio
     }
 
 
-# ============================================================
-# ✏️ Update Challenge (PUT)
-# ============================================================
+#  Update Challenge (PUT)
+
 @app.put("/api/challenges/{challenge_id}", response_model=schemas.ChallengeResponse)
 def update_challenge(challenge_id: int, challenge_data: schemas.ChallengeCreate, db: SessionLocal = Depends(get_db)):
     challenge = db.query(models.Challenge).filter(models.Challenge.id == challenge_id).first()
@@ -311,9 +299,7 @@ def update_challenge(challenge_id: int, challenge_data: schemas.ChallengeCreate,
     return challenge
 
 
-# ============================================================
-# ❌ Delete Challenge
-# ============================================================
+#  Delete Challenge
 @app.delete("/api/challenges/{challenge_id}")
 def delete_challenge(challenge_id: int, db: SessionLocal = Depends(get_db)):
     challenge = db.query(models.Challenge).filter(models.Challenge.id == challenge_id).first()
