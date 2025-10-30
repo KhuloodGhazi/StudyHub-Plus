@@ -26,7 +26,7 @@ class ChallengeCreate(BaseModel):
     end_date: Optional[str] = None
     max_participants: int = 1
 
-    # ✅ تعديل: استخدم default_factory بدل [] لتفادي mutable default
+    #  تعديل: استخدم default_factory بدل [] لتفادي mutable default
     tasks: Optional[List[str]] = []
     participants: Optional[List[Union[int, str]]] = []
     progress: Optional[Dict[str, float]] = {}
@@ -43,7 +43,7 @@ class ChallengeResponse(BaseModel):
     start_date: Optional[str]
     end_date: Optional[str]
 
-    # ✅ تعديل: السماح بقائمة IDs أو أسماء
+    # تعديل: السماح بقائمة IDs أو أسماء
     participants: Optional[List[Union[int, str]]]
     max_participants: int
     tasks: Optional[List[str]]
