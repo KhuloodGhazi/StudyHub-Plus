@@ -1,195 +1,286 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import "../css/Challenges.css";
 import { useAuth } from "../contexts/AuthContext";
 import ChallengeModal from "../components/ChallengeModal";
 import { useNavigate } from "react-router-dom";
 
+type AnyObj = Record<string, any>;
+type Challenge = AnyObj;
+
+type Normalized = Challenge & {
+  /** داخليًا فقط: IDs للمشاركين */
+  _participantIds: number[];
+  /** عدّاد المشاركين بعد التطبيع */
+  _participantsCount: number;
+  /** حالة التحدي لو توفرت */
+  _status?: "Upcoming" | "Active" | "Ended" | string;
+};
+
 export default function Challenges() {
-  const [challenges, setChallenges] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState("browse");
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingChallenge, setEditingChallenge] = useState<any | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [toast, setToast] = useState<string>("");
   const { user } = useAuth();
   const navigate = useNavigate();
 
+  // [FIX] نتعامل مع أنواع مختلفة للمستخدم + fallback من localStorage
+  const currentUserId =
+    (user as any)?.id ?? Number(localStorage.getItem("user_id")) ?? 0; // [FIX]
+  const currentUserName =
+    (user as any)?.name ?? localStorage.getItem("username") ?? "Guest"; // [FIX]
+
+  const [raw, setRaw] = useState<Challenge[]>([]);
+  const [list, setList] = useState<Normalized[]>([]);
+  const [activeTab, setActiveTab] = useState<"browse" | "my">("browse");
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingChallenge, setEditingChallenge] = useState<Challenge | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [toast, setToast] = useState<string>("");
+
+  // ====== Utilities ======
   const showToast = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(""), 2200);
   };
 
+  const safeJSON = async (res: Response) => {
+    try {
+      const ct = res.headers.get("content-type") || "";
+      if (ct.includes("application/json")) return await res.json();
+    } catch {}
+    return null;
+  };
+
+  // participants قد تكون:
+  // number[] | string[] | object[] | undefined
+  const extractParticipantIds = (c: Challenge): number[] => {
+    const src = c?.participants;
+    if (!src) return [];
+    if (Array.isArray(src)) {
+      if (src.length === 0) return [];
+      const first = src[0];
+      if (typeof first === "number") return Array.from(new Set(src as number[]));
+      if (typeof first === "string") {
+        return Array.from(
+          new Set((src as string[]).map((s) => Number(s)).filter((n) => Number.isFinite(n)))
+        );
+      }
+      if (typeof first === "object" && first) {
+        return Array.from(
+          new Set(
+            (src as AnyObj[])
+              .map((p) => Number(p?.id ?? p?.user_id ?? (typeof p === "string" ? p : NaN)))
+              .filter((n) => Number.isFinite(n))
+          )
+        );
+      }
+    }
+    return [];
+  };
+
+  const normalizeOne = (c: Challenge): Normalized => {
+    const ids = extractParticipantIds(c);
+    const pc = typeof c?.participants_count === "number" ? c.participants_count : ids.length;
+    const status: Normalized["_status"] = typeof c?.status === "string" ? c.status : undefined;
+    return { ...c, _participantIds: ids, _participantsCount: pc, _status: status };
+  };
+
+  const normalizeAll = (arr: Challenge[]) => (Array.isArray(arr) ? arr : []).map(normalizeOne);
+
+  // ====== Fetch ======
   const fetchChallenges = () => {
     setLoading(true);
-    fetch("http://127.0.0.1:8000/api/challenges")
-      .then((res) => res.json())
-      .then((data) => setChallenges(data))
+    fetch(`http://127.0.0.1:8000/api/challenges?user_id=${currentUserId}&user_name=${encodeURIComponent(currentUserName)}`) // [CHG] نرسل الاسم أيضاً
+      .then(async (res) => (await safeJSON(res)) ?? [])
+      .then((data) => {
+        setRaw(data);
+        setList(normalizeAll(data));
+      })
       .catch(() => showToast("Failed to load challenges"))
       .finally(() => setLoading(false));
   };
 
   useEffect(() => {
     fetchChallenges();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUserId]);
 
+  // ====== Derived ======
+  const filtered = useMemo(
+    () =>
+      activeTab === "my"
+        ? list.filter((c) => c.creator_id === currentUserId || c._participantIds.includes(currentUserId))
+        : list,
+    [activeTab, list, currentUserId]
+  );
+
+  // ====== Modal ======
   const openModal = () => setIsModalOpen(true);
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingChallenge(null);
   };
 
-  const handleSaveChallenge = (data: any) => {
+  const handleSaveChallenge = (data: AnyObj) => {
     const method = editingChallenge ? "PUT" : "POST";
     const url = editingChallenge
-      ? `http://127.0.0.1:8000/api/challenges/${editingChallenge.id}`
+      ? `http://127.0.0.1:8000/api/challenges/${editingChallenge.id}?user_id=${currentUserId}`
       : "http://127.0.0.1:8000/api/challenges";
+
+    // نضمن توافق الباك: نرسل creator_id + creator_name
+    const payload = { ...data, creator_id: currentUserId, creator_name: currentUserName };
 
     setLoading(true);
     fetch(url, {
       method,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
+      body: JSON.stringify(payload),
     })
-      .then((res) => res.json())
+      .then(async (res) => {
+        if (!res.ok) {
+          const err = (await safeJSON(res)) || {};
+          throw new Error(err.detail || err.message || "Save failed");
+        }
+        return safeJSON(res);
+      })
       .then(() => {
         fetchChallenges();
         closeModal();
         showToast("Saved");
       })
-      .catch(() => showToast("Save failed"))
+      .catch((e: any) => showToast(String(e.message || e)))
       .finally(() => setLoading(false));
   };
 
-  // helper للتعامل مع ردود غير JSON
-  const safeJSON = async (
-    res: Response
-  ): Promise<{ detail?: string; message?: string } | null> => {
-    try {
-      const ct = res.headers.get("content-type") || "";
-      if (ct.includes("application/json")) {
-        return (await res.json()) as { detail?: string; message?: string };
+  // ====== Helpers ======
+  const isOwner = (c: Normalized) => c.creator_id === currentUserId;
+  const isMember = (c: Normalized) => c._participantIds.includes(currentUserId);
+  const isFull = (c: Normalized) =>
+    typeof c.max_participants === "number" && c._participantsCount >= c.max_participants;
+
+  const userProgressOf = (c: Normalized) => {
+    if (c && typeof c.progress === "object" && c.progress) {
+      const v = c.progress[String(currentUserId)];
+      if (typeof v === "number") return v;
+    }
+    if (typeof c?.user_progress === "number") return c.user_progress;
+    return 0;
+  };
+
+  const groupProgressOf = (c: Normalized) => {
+    if (typeof c?.group_progress === "number") return c.group_progress;
+    return 0;
+  };
+
+  // ====== Join / Leave (تفاؤلي + رولباك) ======
+  // ====== Join ======
+const handleJoin = async (id: number) => {
+  // [FIX] إذا ما فيه مستخدم فعلي نخزن قيم مؤقتة
+  const tempUserId =
+    currentUserId && currentUserId !== 0
+      ? currentUserId
+      : (() => {
+          const fakeId = 999999;
+          localStorage.setItem("user_id", String(fakeId));
+          return fakeId;
+        })();
+
+  const tempUserName =
+    currentUserName && currentUserName !== "Guest"
+      ? currentUserName
+      : (() => {
+          const fakeName = "Guest";
+          localStorage.setItem("username", fakeName);
+          return fakeName;
+        })();
+
+  // تفاؤلي: نحدث الواجهة فورًا
+  setList((prev) =>
+    prev.map((c) =>
+      c.id === id
+        ? {
+            ...c,
+            _participantIds: c._participantIds.includes(tempUserId)
+              ? c._participantIds
+              : [...c._participantIds, tempUserId],
+            _participantsCount: c._participantIds.includes(tempUserId)
+              ? c._participantsCount
+              : c._participantsCount + 1,
+          }
+        : c
+    )
+  );
+
+  // ✅ [FIX] نرجع المستخدم مباشرة لتبويب "My Challenges"
+  setActiveTab("my"); // هذا السطر يرجّع السلوك القديم
+
+  showToast("Joined");
+
+  setLoading(true);
+  try {
+    await fetch(
+      `http://127.0.0.1:8000/api/challenges/${id}/join?user_id=${tempUserId}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_name: tempUserName }),
       }
-    } catch {}
-    return null;
-  };
-
-  // ===== Join: إضافة فورية + مزامنة =====
-  const handleJoin = (id: number) => {
-    const currentUser = user?.name || "Guest";
-
-    // إضافة فورية محليًا + تحويل لتبويب My
-    setChallenges((prev) =>
-      prev.map((c) =>
-        c.id === id
-          ? {
-              ...c,
-              participants: Array.isArray(c.participants)
-                ? Array.from(new Set([...c.participants, currentUser]))
-                : [currentUser],
-            }
-          : c
-      )
     );
-    setActiveTab("my");
-    showToast("Joined");
+    fetchChallenges(); // مزامنة بعد الانضمام
+  } catch (e: any) {
+    console.error(e);
+    showToast("Failed to join");
+  } finally {
+    setLoading(false);
+  }
+};
 
-    // استدعاء API
-    setLoading(true);
-    fetch(`http://127.0.0.1:8000/api/challenges/${id}/join`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user_name: currentUser }),
-    })
-      .then(async (res) => {
-        if (!res.ok) {
-          const data = await safeJSON(res);
-          const msg =
-            (data?.detail && typeof data.detail === "string" && data.detail) ||
-            (data?.message &&
-              typeof data.message === "string" &&
-              data.message) ||
-            "Join failed";
-          throw new Error(msg);
-        }
-        await safeJSON(res);
-      })
-      .then(() => {
-        fetchChallenges(); // مزامنة هادئة
-      })
-      .catch((e) => {
-        // رول-باك
-        setChallenges((prev) =>
-          prev.map((c) =>
-            c.id === id
-              ? {
-                  ...c,
-                  participants: Array.isArray(c.participants)
-                    ? c.participants.filter((p: string) => p !== currentUser)
-                    : [],
-                }
-              : c
-          )
-        );
-        showToast(String(e.message || e));
-      })
-      .finally(() => setLoading(false));
-  };
+// ====== Leave ======
+const handleLeave = async (id: number) => {
+  const tempUserId =
+    currentUserId && currentUserId !== 0
+      ? currentUserId
+      : Number(localStorage.getItem("user_id")) || 999999;
 
-  // ===== Leave: DELETE + body { user_name } مع رول-باك =====
-  const handleLeave = (id: number) => {
-    const currentUser = user?.name || "Guest";
+  const tempUserName =
+    currentUserName && currentUserName !== "Guest"
+      ? currentUserName
+      : localStorage.getItem("username") || "Guest";
 
-    // إزالة محلية تفاؤلية
-    setChallenges((prev) =>
-      prev.map((c) =>
-        c.id === id
-          ? {
-              ...c,
-              participants: Array.isArray(c.participants)
-                ? c.participants.filter((p: string) => p !== currentUser)
-                : [],
-            }
-          : c
-      )
+  // تفاؤلي
+  setList((prev) =>
+    prev.map((c) =>
+      c.id === id
+        ? {
+            ...c,
+            _participantIds: c._participantIds.filter((pid) => pid !== tempUserId),
+            _participantsCount: Math.max(0, c._participantsCount - 1),
+          }
+        : c
+    )
+  );
+
+  showToast("Left");
+
+  setLoading(true);
+  try {
+    await fetch(
+      `http://127.0.0.1:8000/api/challenges/${id}/leave?user_id=${tempUserId}`,
+      {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_name: tempUserName }),
+      }
     );
+    fetchChallenges(); // مزامنة بعد الخروج
+  } catch (e: any) {
+    console.error(e);
+    showToast("Failed to leave");
+  } finally {
+    setLoading(false);
+  }
+};
 
-    setLoading(true);
-    fetch(`http://127.0.0.1:8000/api/challenges/${id}/leave`, {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user_name: currentUser }),
-    })
-      .then(async (res) => {
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          throw new Error(data.detail || "Leave failed");
-        }
-        return res.json().catch(() => ({}));
-      })
-      .then(() => {
-        showToast("Left");
-        fetchChallenges(); // مزامنة مع السيرفر
-      })
-      .catch((e) => {
-        showToast(`${e.message}`);
-        // رول-باك لو فشل
-        setChallenges((prev) =>
-          prev.map((c) =>
-            c.id === id
-              ? {
-                  ...c,
-                  participants: Array.isArray(c.participants)
-                    ? Array.from(new Set([...c.participants, currentUser]))
-                    : [currentUser],
-                }
-              : c
-          )
-        );
-      })
-      .finally(() => setLoading(false));
-  };
 
-  const handleEdit = (c: any) => {
+  // ====== Edit/Delete ======
+  const handleEdit = (c: Challenge) => {
     setEditingChallenge(c);
     setIsModalOpen(true);
   };
@@ -197,25 +288,20 @@ export default function Challenges() {
   const handleDelete = (id: number) => {
     if (!confirm("Delete this challenge?")) return;
     setLoading(true);
-    fetch(`http://127.0.0.1:8000/api/challenges/${id}`, { method: "DELETE" })
-      .then(() => {
-        fetchChallenges();
+    fetch(`http://127.0.0.1:8000/api/challenges/${id}?user_id=${currentUserId}`, {
+      method: "DELETE",
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          const err = (await safeJSON(res)) || {};
+          throw new Error(err.detail || err.message || "Delete failed");
+        }
         showToast("Deleted");
+        fetchChallenges();
       })
-      .catch(() => showToast("Delete failed"))
+      .catch((e: any) => showToast(String(e.message || e)))
       .finally(() => setLoading(false));
   };
-
-  // تبويب "My" = ما أنشأته أو انضممت له
-  const filtered =
-    activeTab === "my"
-      ? challenges.filter(
-          (c) =>
-            c.creator_name === (user?.name || "Guest") ||
-            (Array.isArray(c.participants) &&
-              c.participants.includes(user?.name || "Guest"))
-        )
-      : challenges;
 
   return (
     <div className="challenges-container">
@@ -245,46 +331,32 @@ export default function Challenges() {
 
       <div className="challenge-grid">
         {filtered.map((c) => {
-          const currentUser = user?.name || "Guest";
-          const isOwner = c.creator_name === currentUser;
-          const isMember =
-            Array.isArray(c.participants) &&
-            c.participants.includes(currentUser);
+          const owner = isOwner(c);
+          const member = isMember(c);
+          const isJoined = member; // [ADD] اسم أوضح للاستخدام أسفل
+          const showUserProgress = owner || member;
 
-          // نظهر "You Progress" فقط للمالك أو العضو
-          const showUserProgress = isOwner || isMember;
+          const uProg = userProgressOf(c);
+          const gProg = groupProgressOf(c);
+          const full = isFull(c);
 
-          // التعامل مع الامتلاء سواء participants Array أو رقم
-          const isFull = Array.isArray(c.participants)
-            ? c.participants.length >= c.max_participants
-            : (c.participants ?? 0) >= c.max_participants;
+          const statusClass =
+            c._status === "Active" ? "active" : c._status === "Ended" ? "ended" : c._status ? "upcoming" : "";
 
-          // قيم مؤقتة إن ما وصلتنا من الباك
-          const userProgress = c.user_progress ?? 40;
-
-          // ===== منطق Placeholder للـ Group Progress (Demo) =====
-          const participantsCount = Array.isArray(c.participants)
-            ? c.participants.length
-            : 0;
-          const groupProgressRaw =
-            typeof c.group_progress === "number" &&
-            !Number.isNaN(c.group_progress)
-              ? c.group_progress
-              : 0;
-          // لو ما فيه مشاركين وما فيه أي تقدم محسوب → اعرض 70 شكل تجريبي
-          const groupProgress =
-            participantsCount === 0 && groupProgressRaw === 0
-              ? 70
-              : groupProgressRaw;
+          const renderTask = (t: any) => (typeof t === "string" ? t : t?.title ?? "");
+          const isDone = (t: any) => (typeof t === "object" && t ? Boolean(t.done) : false);
 
           return (
             <div
-              className={`challenge-card ${c.level?.toLowerCase()}`}
+              className={`challenge-card ${c.level?.toLowerCase?.() || ""}`}
               key={c.id}
-              onClick={() => navigate(`/challenges/${c.id}`)}
-              style={{ cursor: "pointer" }}
+              onClick={() => !loading && navigate(`/challenges/${c.id}`)}
+              style={{ cursor: loading ? "not-allowed" : "pointer" }}
             >
-              <h2>{c.title}</h2>
+              <div className="card-header">
+                {c._status && <span className={`status-badge ${statusClass}`}>{c._status}</span>}
+                <h2 className="challenge-title">{c.title}</h2>
+              </div>
 
               <div className="creator-level-row">
                 <p className="creator">By {c.creator_name}</p>
@@ -298,7 +370,7 @@ export default function Challenges() {
 
               <div className="participants-row">
                 <span className="material-icons">group</span>
-                <p>Total {c.max_participants} Participants</p>
+                <p>Total {c._participantsCount} Participants</p>
               </div>
 
               <div className="awards-row">
@@ -306,90 +378,90 @@ export default function Challenges() {
                 <p>There are awards when you’re done</p>
               </div>
 
-              {/* ===== شريط التقدم ===== */}
+              {/* ===== Progress ===== */}
               <div className="progress-section">
-                {/* التقدم الفردي → يظهر فقط للمالك أو العضو */}
                 {showUserProgress && (
                   <div className="progress-row">
                     <div className="progress-label">
-                      <span>You Progress</span>
-                      <span className="progress-percent">
-                        {userProgress}%
-                      </span>
+                      <span>Your Progress</span>
+                      <span className="progress-percent">{uProg}%</span>
                     </div>
                     <div className="progress-bar">
-                      <div
-                        className="progress-fill user"
-                        style={{ width: `${userProgress}%` }}
-                      ></div>
+                      <div className="progress-fill user" style={{ width: `${uProg}%` }} />
                     </div>
                   </div>
                 )}
 
-                {/* التقدم الجماعي → للجميع */}
                 <div className="progress-row">
                   <div className="progress-label">
                     <span>Group Progress</span>
-                    <span className="progress-percent">
-                      {groupProgress}%
-                    </span>
+                    <span className="progress-percent">{gProg}%</span>
                   </div>
                   <div className="progress-bar">
-                    <div
-                      className="progress-fill group"
-                      style={{ width: `${groupProgress}%` }}
-                    ></div>
+                    <div className="progress-fill group" style={{ width: `${gProg}%` }} />
                   </div>
                 </div>
               </div>
 
+              {/* ===== Requirements / Tasks ===== */}
               <div className="requirements-section">
                 <h4>Requirements</h4>
                 <ul className="requirements-list">
                   {Array.isArray(c.tasks) &&
-                    c.tasks.map((task: string, idx: number) => (
+                    c.tasks.map((task: any, idx: number) => (
                       <li key={`${c.id}-task-${idx}`}>
-                        <span className="material-icons">check_circle</span>
-                        <span>{task}</span>
+                        <span className="material-icons">
+                          {isDone(task) ? "check_circle" : "radio_button_unchecked"}
+                        </span>
+                        <span>{renderTask(task)}</span>
                       </li>
                     ))}
                 </ul>
               </div>
 
-              {/* ===== الأزرار ===== */}
-              <div
-                className="card-actions"
-                onClick={(e) => e.stopPropagation()}
-              >
-                {isOwner ? (
+              {/* ===== Actions ===== */}
+              <div className="card-actions" onClick={(e) => e.stopPropagation()}>
+                {owner ? (
                   <>
                     <button className="edit-btn" onClick={() => handleEdit(c)}>
                       Edit
                     </button>
-                    <button
-                      className="delete-btn"
-                      onClick={() => handleDelete(c.id)}
-                    >
+                    <button className="delete-btn" onClick={() => handleDelete(c.id)}>
                       Delete
                     </button>
+
+                    {/* [ADD] المالك يقدر ينضم/يخرج كباقي المستخدمين */}
+                    {!isJoined && !full && (
+                      <button className="join-btn" onClick={() => handleJoin(c.id)} disabled={loading}>
+                         {loading ? "Joining..." : "Join"}
+                      </button>
+                    )}
+                    {isJoined && (
+                      <button
+                        className={`leave-btn ${c.level?.toLowerCase?.() || ""}`}
+                        onClick={() => handleLeave(c.id)}
+                        disabled={loading}
+                      >
+                        {loading ? "Leaving..." : "Leave"}
+                      </button>
+                    )}
+                    {full && !isJoined && <button className="join-btn full" disabled>Full</button>}
                   </>
-                ) : isMember ? (
+                ) : isJoined ? (
                   <button
-                    className={`leave-btn ${c.level?.toLowerCase()}`}
+                    className={`leave-btn ${c.level?.toLowerCase?.() || ""}`}
                     onClick={() => handleLeave(c.id)}
+                    disabled={loading}
                   >
-                    Leave Challenge
+                    {loading ? "Leaving..." : "Leave Challenge"}
                   </button>
-                ) : isFull ? (
+                ) : full ? (
                   <button className="join-btn full" disabled>
                     Full
                   </button>
                 ) : (
-                  <button
-                    className="join-btn"
-                    onClick={() => handleJoin(c.id)}
-                  >
-                    Join Challenge
+                  <button className="join-btn" onClick={() => handleJoin(c.id)} disabled={loading}>
+                    {loading ? "Joining..." : "Join Challenge"}
                   </button>
                 )}
               </div>

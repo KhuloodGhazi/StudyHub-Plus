@@ -1,8 +1,7 @@
-// StudyHup/components/challengeModal.tsx
-
 import React, { useEffect, useState } from "react";
 import Modal from "react-modal";
 import DatePicker from "react-datepicker";
+import { useAuth } from "../contexts/AuthContext";
 import "react-datepicker/dist/react-datepicker.css";
 
 Modal.setAppElement("#root");
@@ -18,10 +17,12 @@ export default function ChallengeModal({
   onSave: (data: any) => void;
   initialData?: any;
 }) {
+  const { user } = useAuth();
+
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [requirements, setRequirements] = useState<string[]>([]);
-  const [newRequirement, setNewRequirement] = useState("");
+  const [tasks, setTasks] = useState<string[]>([]);
+  const [newTask, setNewTask] = useState("");
   const [level, setLevel] = useState("Easy");
   const [startDate, setStartDate] = useState<Date | null>(new Date());
   const [endDate, setEndDate] = useState<Date | null>(null);
@@ -32,8 +33,7 @@ export default function ChallengeModal({
     if (initialData) {
       setTitle(initialData.title || "");
       setDescription(initialData.description || "");
-      // ✅ الضرورة الوحيدة: نقرأ من tasks لو موجودة وإلا من requirements
-      setRequirements(initialData.tasks || initialData.requirements || []);
+      setTasks(initialData.tasks || initialData.requirements || []);
       setLevel(initialData.level || "Easy");
       setStartDate(
         initialData.start_date ? new Date(initialData.start_date) : new Date()
@@ -43,7 +43,7 @@ export default function ChallengeModal({
     } else {
       setTitle("");
       setDescription("");
-      setRequirements([]);
+      setTasks([]);
       setLevel("Easy");
       setStartDate(new Date());
       setEndDate(null);
@@ -66,34 +66,35 @@ export default function ChallengeModal({
     const err = validate();
     if (err) return setErrors(err);
 
-    // ✅ الضرورة الثانية: نرسل tasks للخادم (ونخلّي المتطلبات نظيفة)
-    const cleanTasks = requirements
-      .map((r) => r.trim())
-      .filter((r) => r.length > 0);
+    const cleanTasks = tasks.map((t) => t.trim()).filter((t) => t.length > 0);
 
     const data = {
       title,
       description,
-      // نرسل الحقلين لضمان التوافق، لكن الخادم والصفحة الثانية يعتمدون tasks
-      tasks: cleanTasks,
-      requirements: cleanTasks,
       level,
       start_date: startDate ? startDate.toISOString().split("T")[0] : null,
       end_date: endDate ? endDate.toISOString().split("T")[0] : null,
       max_participants: maxParticipants,
-      creator_name: localStorage.getItem("username") || "Guest",
+      tasks: cleanTasks,
+      creator_name:
+        user?.name || localStorage.getItem("username") || "Guest",
+      creator_id:
+        (user as any)?.id ||
+        Number(localStorage.getItem("user_id")) ||
+        0,
     };
+
     onSave(data);
   };
 
-  const addRequirement = () => {
-    if (!newRequirement.trim()) return;
-    setRequirements([...requirements, newRequirement.trim()]);
-    setNewRequirement("");
+  const addTask = () => {
+    if (!newTask.trim()) return;
+    setTasks([...tasks, newTask.trim()]);
+    setNewTask("");
   };
 
-  const removeRequirement = (index: number) => {
-    setRequirements(requirements.filter((_, i) => i !== index));
+  const removeTask = (index: number) => {
+    setTasks(tasks.filter((_, i) => i !== index));
   };
 
   return (
@@ -127,26 +128,25 @@ export default function ChallengeModal({
           />
         </div>
 
-        {/* ✅ Requirements section */}
         <div className="form-group">
-          <label>Requirements / Tasks</label>
+          <label>Tasks</label>
           <div className="requirements-input">
             <input
-              value={newRequirement}
-              onChange={(e) => setNewRequirement(e.target.value)}
-              placeholder="Add a task..."
+              value={newTask}
+              onChange={(e) => setNewTask(e.target.value)}
+              placeholder="Add a new task..."
             />
-            <button type="button" onClick={addRequirement}>
+            <button type="button" onClick={addTask}>
               + Add
             </button>
           </div>
           <ul className="requirements-list">
-            {requirements.map((req, i) => (
+            {tasks.map((task, i) => (
               <li key={i}>
-                {req}
+                {task}
                 <button
                   type="button"
-                  onClick={() => removeRequirement(i)}
+                  onClick={() => removeTask(i)}
                   className="remove-btn"
                 >
                   ✕
@@ -156,7 +156,6 @@ export default function ChallengeModal({
           </ul>
         </div>
 
-        {/* ✅ Difficulty buttons */}
         <div className="form-group">
           <label>Difficulty Level</label>
           <div className="difficulty-options">

@@ -1,31 +1,27 @@
 @import url("https://fonts.googleapis.com/icon?family=Material+Icons");
 
+:root { --sidebar-w: 260px; }
+
+/* الشريط الجانبي */
 .sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  width: var(--sidebar-w);
+
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  width: 260px;
-  height: 100vh;
+
   background-color: #faf8f6;
-  border-radius: 15px;
   padding: 20px;
+  border-radius: 15px;
+  box-shadow: none;
 }
 
-.logo {
-  text-align: center;
-}
-
-.logo-img {
-  width: 100px;
-  margin-bottom: 10px;
-}
-
-.logo h2 {
-  font-size: 14px;
-  color: #001b44;
-  font-weight: 600;
-  letter-spacing: 1px;
-}
+.logo { text-align: center; }
+.logo-img { width: 100px; margin-bottom: 10px; }
+.logo h2 { font-size: 14px; color: #001b44; font-weight: 600; letter-spacing: 1px; }
 
 .nav-links {
   display: flex;
@@ -44,21 +40,15 @@
   border-radius: 10px;
   text-decoration: none;
   transition: all 0.3s ease;
+  border: none;
+  background: transparent;
+  cursor: pointer;
 }
 
-.nav-item:hover {
-  background-color: #fff3cd;
-  color: #f4b400;
-}
+.nav-item:hover { background-color: #fff3cd; color: #f4b400; }
+.nav-item.active { color: #f4b400; font-weight: 600; }
 
-.nav-item.active {
-  color: #f4b400;
-  font-weight: 600;
-}
-
-.material-icons {
-  font-size: 22px;
-}
+.material-icons { font-size: 22px; }
 
 .logout {
   display: flex;
@@ -71,7 +61,4 @@
   border-radius: 10px;
   transition: 0.3s;
 }
-
-.logout:hover {
-  background-color: #f8f9fa;
-}
+.logout:hover { background-color: #f8f9fa; }

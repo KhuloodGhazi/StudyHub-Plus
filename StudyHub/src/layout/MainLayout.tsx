@@ -21,6 +21,20 @@ export default function MainLayout({ children }: MainLayoutProps) {
 import Sidebar from "../components/Sidebar";
 import "../css/Sidebar.css";
 
+
+{/*import { Outlet } from "react-router-dom";
+import Sidebar from "../components/Sidebar";
+import "../css/Sidebar.css";
+
+
+{/*import { Outlet } from "react-router-dom";
+import Sidebar from "../components/Sidebar";
+import "../css/Sidebar.css";
+
+{/*import { Outlet } from "react-router-dom";
+import Sidebar from "../components/Sidebar";
+import "../css/Sidebar.css";
+
 /**
  * MainLayout Component
  * --------------------
